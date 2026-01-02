@@ -2,7 +2,7 @@
 
 A stunning, modern macOS application for transcribing audio files using OpenAI's Whisper model with CoreML acceleration. Features a beautiful liquid-glass UI design with real-time transcription streaming.
 
-![macOS](https://img.shields.io/badge/macOS-13.0+-blue)
+![macOS](https://img.shields.io/badge/macOS-26.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-4.0-green)
 
@@ -32,8 +32,8 @@ A stunning, modern macOS application for transcribing audio files using OpenAI's
 
 ## 📋 Requirements
 
-- macOS 13.0 (Ventura) or later
-- Apple Silicon (M1/M2/M3) or Intel Mac
+- macOS 26.0 (Tahoe) or later
+- Apple Silicon (M1/M2/M3)
 - Xcode 15.0 or later
 
 ## 🚀 Installation & Setup
@@ -97,7 +97,7 @@ Check that resources are properly included:
 
 #### Minimum Deployment Target
 Verify in Build Settings:
-- macOS Deployment Target: `13.0` or later
+- macOS Deployment Target: `26.0` or later
 
 ### 4. Build and Run
 
