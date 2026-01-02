@@ -1,0 +1,4 @@
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.dylib filter=lfs diff=lfs merge=lfs -text
+Vocal[[:space:]]Prism/Resources/ggml-base.en-encoder.mlmodelc/** filter=lfs diff=lfs merge=lfs -text
+Vocal[[:space:]]Prism/Resources/whisper-cli filter=lfs diff=lfs merge=lfs -text

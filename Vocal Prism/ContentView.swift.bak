@@ -1,0 +1,395 @@
+//
+//  ContentView.swift
+//  Vocal Prism
+//
+//  Created by Aarush Prakash on 12/7/25.
+//
+
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct ContentView: View {
+    @StateObject private var whisperEngine = WhisperEngine()
+    
+    @State private var selectedAudioFile: URL?
+    @State private var isDropTargeted = false
+    @State private var showingSettings = false
+    
+    // Transcription options
+    @State private var selectedThreads = 4
+    @State private var selectedModel: WhisperEngine.ModelVariant = .base
+    @State private var includeTimestamps = true
+    @State private var exportSRT = false
+    
+    // UI state
+    @State private var showingTranscription = false
+    
+    var body: some View {
+        ZStack {
+            AnimatedGradientBackground()
+            
+            VStack(spacing: 0) {
+                // Header
+                headerView
+                    .padding(.top, 20)
+                    .padding(.horizontal, 30)
+                
+                // Main Content Area
+                if let audioFile = selectedAudioFile, showingTranscription {
+                    transcriptionView(audioFile: audioFile)
+                        .padding(30)
+                        .transition(.opacity.combined(with: .scale))
+                } else {
+                    dropZoneArea
+                        .padding(30)
+                        .transition(.opacity.combined(with: .scale))
+                }
+            }
+        }
+        .frame(minWidth: 800, minHeight: 600)
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            handleDrop(providers: providers)
+        }
+        .sheet(isPresented: $showingSettings) {
+            settingsView
+        }
+    }
+    
+    // MARK: - Header View
+    private var headerView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    Image(systemName: "waveform.badge.mic")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    
+                    Text("Vocal Prism")
+                        .font(.title)
+                        .fontWeight(.bold)
+                }
+                
+                Text(whisperEngine.currentStatus)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 12) {
+                if showingTranscription {
+                    GlassButton(title: "New", icon: "plus.circle.fill") {
+                        resetView()
+                    }
+                }
+                
+                GlassButton(title: "Settings", icon: "gear") {
+                    showingSettings = true
+                }
+            }
+        }
+        .padding(20)
+        .glassBackground()
+    }
+    
+    // MARK: - Drop Zone
+    private var dropZoneArea: some View {
+        DropZoneView(isTargeted: $isDropTargeted) { url in
+            handleFileSelection(url: url)
+        }
+    }
+    
+    // MARK: - Transcription View
+    private func transcriptionView(audioFile: URL) -> some View {
+        VStack(spacing: 20) {
+            // Audio file info
+            audioFileInfoView(audioFile: audioFile)
+            
+            // Waveform visualization
+            if whisperEngine.isTranscribing {
+                WaveformView(isActive: whisperEngine.isTranscribing)
+                    .frame(height: 80)
+                    .glassBackground()
+                    .transition(.opacity.combined(with: .scale))
+            }
+            
+            // Progress bar
+            if whisperEngine.isTranscribing || whisperEngine.progress > 0 {
+                VStack(spacing: 8) {
+                    GlassProgressBar(progress: whisperEngine.progress)
+                    
+                    Text("\(Int(whisperEngine.progress * 100))% Complete")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+                .transition(.opacity)
+            }
+            
+            // Transcription text area
+            transcriptionTextView
+            
+            // Action buttons
+            actionButtonsView
+        }
+    }
+    
+    private func audioFileInfoView(audioFile: URL) -> some View {
+        HStack {
+            Image(systemName: "music.note")
+                .font(.title2)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(audioFile.lastPathComponent)
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                if let fileSize = try? FileManager.default.attributesOfItem(atPath: audioFile.path)[.size] as? Int64 {
+                    Text(ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .glassBackground()
+    }
+    
+    private var transcriptionTextView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if whisperEngine.transcriptionText.isEmpty && !whisperEngine.isTranscribing {
+                        VStack(spacing: 10) {
+                            Image(systemName: "text.bubble")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary.opacity(0.5))
+                            
+                            Text("Transcription will appear here")
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(40)
+                    } else {
+                        Text(whisperEngine.transcriptionText)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id("transcriptionEnd")
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity)
+            .glassBackground()
+            .onChange(of: whisperEngine.transcriptionText) { _, _ in
+                // Auto-scroll to bottom as new text arrives
+                withAnimation {
+                    proxy.scrollTo("transcriptionEnd", anchor: .bottom)
+                }
+            }
+        }
+    }
+    
+    private var actionButtonsView: some View {
+        HStack(spacing: 12) {
+            if whisperEngine.isTranscribing {
+                GlassButton(title: "Cancel", icon: "stop.circle.fill", action: {
+                    whisperEngine.cancelTranscription()
+                }, isDestructive: true)
+            } else if !whisperEngine.transcriptionText.isEmpty {
+                GlassButton(title: "Copy", icon: "doc.on.doc") {
+                    copyTranscription()
+                }
+                
+                GlassButton(title: "Save", icon: "square.and.arrow.down") {
+                    saveTranscriptionManually()
+                }
+                
+                GlassButton(title: "Export SRT", icon: "captions.bubble") {
+                    exportSubtitles()
+                }
+            } else {
+                GlassButton(title: "Start Transcription", icon: "play.circle.fill") {
+                    startTranscription()
+                }
+            }
+            
+            Spacer()
+        }
+    }
+    
+    // MARK: - Settings View
+    private var settingsView: some View {
+        VStack(spacing: 20) {
+            Text("Transcription Settings")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Form {
+                Section("Performance") {
+                    HStack {
+                        Text("CPU Threads:")
+                        Spacer()
+                        Picker("", selection: $selectedThreads) {
+                            ForEach([1, 2, 4, 6, 8], id: \.self) { thread in
+                                Text("\(thread)").tag(thread)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 100)
+                    }
+                }
+                
+                Section("Model") {
+                    Picker("Model Variant:", selection: $selectedModel) {
+                        ForEach(WhisperEngine.ModelVariant.allCases, id: \.self) { model in
+                            Text(model.displayName).tag(model)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    
+                    Text("Note: Only models included in the app bundle are available.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Section("Output Options") {
+                    Toggle("Include Timestamps", isOn: $includeTimestamps)
+                    Toggle("Export SRT Subtitles", isOn: $exportSRT)
+                }
+            }
+            .formStyle(.grouped)
+            
+            HStack {
+                Button("Close") {
+                    showingSettings = false
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(30)
+        .frame(width: 500, height: 450)
+    }
+    
+    // MARK: - Helper Methods
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+            guard let data = item as? Data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                handleFileSelection(url: url)
+            }
+        }
+        
+        return true
+    }
+    
+    private func handleFileSelection(url: URL) {
+        let supportedExtensions = ["mp3", "wav", "m4a", "flac"]
+        guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
+            whisperEngine.error = "Unsupported file format"
+            return
+        }
+        
+        selectedAudioFile = url
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            showingTranscription = true
+        }
+    }
+    
+    private func startTranscription() {
+        guard let audioFile = selectedAudioFile else { return }
+        
+        let options = WhisperEngine.TranscriptionOptions(
+            threads: selectedThreads,
+            modelVariant: selectedModel,
+            includeTimestamps: includeTimestamps,
+            exportSRT: exportSRT
+        )
+        
+        whisperEngine.transcribe(audioFile: audioFile, options: options) { result in
+            switch result {
+            case .success(let text):
+                print("Transcription completed: \(text.prefix(100))...")
+            case .failure(let error):
+                print("Transcription failed: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func copyTranscription() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(whisperEngine.transcriptionText, forType: .string)
+        
+        whisperEngine.currentStatus = "Copied to clipboard"
+    }
+    
+    private func saveTranscriptionManually() {
+        guard let audioFile = selectedAudioFile else { return }
+        
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.plainText]
+        savePanel.nameFieldStringValue = audioFile.deletingPathExtension().lastPathComponent + ".txt"
+        
+        if savePanel.runModal() == .OK, let url = savePanel.url {
+            do {
+                try whisperEngine.transcriptionText.write(to: url, atomically: true, encoding: .utf8)
+                whisperEngine.currentStatus = "Saved successfully"
+            } catch {
+                whisperEngine.error = "Failed to save: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func exportSubtitles() {
+        guard let audioFile = selectedAudioFile else { return }
+        
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [UTType(filenameExtension: "srt")!]
+        savePanel.nameFieldStringValue = audioFile.deletingPathExtension().lastPathComponent + ".srt"
+        
+        if savePanel.runModal() == .OK, let url = savePanel.url {
+            // Note: SRT export is handled by whisper-cli with -osrt flag
+            // This just shows the save dialog. The actual SRT file should be
+            // generated alongside the audio file automatically if exportSRT is enabled
+            whisperEngine.currentStatus = "SRT export configured"
+        }
+    }
+    
+    private func resetView() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            showingTranscription = false
+            selectedAudioFile = nil
+            whisperEngine.transcriptionText = ""
+            whisperEngine.progress = 0.0
+            whisperEngine.currentStatus = "Ready"
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+        .frame(width: 900, height: 700)
+}

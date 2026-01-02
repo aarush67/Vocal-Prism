@@ -1,0 +1,12 @@
+
+small.en
+     https://huggingface.co/aarush67/whisper-coreml-models/resolve/main/small.en/ggml-small.en.bin?download=true
+            ggml-small.en-encoder.mlmodelc
+                    https://huggingface.co/aarush67/whisper-coreml-models/resolve/main/small.en/ggml-small.en-encoder.mlmodelc/coremldata.bin?download=true
+                    https://huggingface.co/aarush67/whisper-coreml-models/resolve/main/small.en/ggml-small.en-encoder.mlmodelc/metadata.json?download=true
+                    https://huggingface.co/aarush67/whisper-coreml-models/resolve/main/small.en/ggml-small.en-encoder.mlmodelc/model.mil?download=true
+                weights
+                    https://huggingface.co/aarush67/whisper-coreml-models/resolve/main/small.en/ggml-small.en-encoder.mlmodelc/weights/weight.bin?download=true
+                analytics
+                    https://huggingface.co/aarush67/whisper-coreml-models/resolve/main/small.en/ggml-small.en-encoder.mlmodelc/analytics/coremldata.bin?download=true
+
